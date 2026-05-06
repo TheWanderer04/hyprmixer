@@ -4,6 +4,7 @@ import { useContext } from 'react'
 import { PlayerContext } from './contexts/PlayerContext'
 import PlayerList from './components/playerList/PlayerList'
 import Settings from './components/settings/Settings'
+import SinkMixer from './components/sinkMixer/SinkMixer'
 
 function App() {
   const { pageOpened } = useContext(PlayerContext)
@@ -23,6 +24,11 @@ function App() {
       return <div className="select-none flex items-center justify-center h-dvh">
         <Navbar />
         <Settings />
+      </div>
+    case 3:
+      return <div className="select-none flex items-start justify-center h-dvh">
+        <Navbar />
+        <SinkMixer />
       </div>
   }
 }

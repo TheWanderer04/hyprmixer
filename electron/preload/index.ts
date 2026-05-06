@@ -1,7 +1,5 @@
-import { getCurrentTrack, getPlayers, togglePlayPause } from '@/service/playerService'
 import { ipcRenderer, contextBridge } from 'electron'
 
-// --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('ipcRenderer', {
   on(...args: Parameters<typeof ipcRenderer.on>) {
     const [channel, listener] = args
@@ -19,47 +17,44 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     const [channel, ...omit] = args
     return ipcRenderer.invoke(channel, ...omit)
   },
-  // You can expose other APTs you need here.
-  // ...
 })
 
 contextBridge.exposeInMainWorld('playerCtlAPI', {
-  getPlayers() {
-    return ipcRenderer.invoke('list-players')
-  },
-  getCurrentTrack(player: string) {
-    return ipcRenderer.invoke('get-current-track', player)
-  },
-  togglePlayPause(player: string) {
-    ipcRenderer.invoke('play-pause', player)
-  },
-  next(player: string) {
-    ipcRenderer.invoke('next', player)
-  },
-  prev(player: string) {
-    ipcRenderer.invoke('prev', player)
-  },
-  changePosition(player: string, position: string) {
-    ipcRenderer.invoke('change-position', player, position)
-  },
-  getPlayerVolume(player: string) {
-    ipcRenderer.invoke('get-player-volume', player)
-  },
-  setPlayerVolume(player: string, volume: number) {
-    ipcRenderer.invoke('set-player-volume', player, volume)
-  }
+  getPlayers() { return ipcRenderer.invoke('list-players') },
+  getCurrentTrack(player: string) { return ipcRenderer.invoke('get-current-track', player) },
+  togglePlayPause(player: string) { ipcRenderer.invoke('play-pause', player) },
+  next(player: string) { ipcRenderer.invoke('next', player) },
+  prev(player: string) { ipcRenderer.invoke('prev', player) },
+  changePosition(player: string, position: string) { ipcRenderer.invoke('change-position', player, position) },
+  getPlayerVolume(player: string) { ipcRenderer.invoke('get-player-volume', player) },
+  setPlayerVolume(player: string, volume: number) { ipcRenderer.invoke('set-player-volume', player, volume) }
 })
 
-// --------- Preload scripts loading ---------
+contextBridge.exposeInMainWorld('pactlAPI', {
+  listSinks() { return ipcRenderer.invoke('list-sinks') },
+  listSinkInputs() { return ipcRenderer.invoke('list-sink-inputs') },
+  setSinkVolume(sinkId: number, volume: number) { ipcRenderer.invoke('set-sink-volume', sinkId, volume) },
+  setSinkMute(sinkId: number, mute: boolean) { ipcRenderer.invoke('set-sink-mute', sinkId, mute) },
+  setDefaultSink(sinkName: string) { ipcRenderer.invoke('set-default-sink', sinkName) },
+  setSinkInputVolume(inputId: number, volume: number) { ipcRenderer.invoke('set-sink-input-volume', inputId, volume) },
+  setSinkInputMute(inputId: number, mute: boolean) { ipcRenderer.invoke('set-sink-input-mute', inputId, mute) },
+  moveSinkInput(inputId: number, sinkId: number) { ipcRenderer.invoke('move-sink-input', inputId, sinkId) },
+  listSources() { return ipcRenderer.invoke('list-sources') },
+  setSourceVolume(sourceId: number, volume: number) { ipcRenderer.invoke('set-source-volume', sourceId, volume) },
+  setSourceMute(sourceId: number, mute: boolean) { ipcRenderer.invoke('set-source-mute', sourceId, mute) },
+  setDefaultSource(sourceName: string) { ipcRenderer.invoke('set-default-source', sourceName) },
+  listCards() { return ipcRenderer.invoke('list-cards') },
+  setCardProfile(cardId: number, profileId: string) { ipcRenderer.invoke('set-card-profile', cardId, profileId) },
+})
+
+// Loading spinner setup (unchanged)
 function domReady(condition: DocumentReadyState[] = ['complete', 'interactive']) {
   return new Promise(resolve => {
     if (condition.includes(document.readyState)) {
       resolve(true)
     } else {
       document.addEventListener('readystatechange', () => {
-        if (condition.includes(document.readyState)) {
-          resolve(true)
-        }
+        if (condition.includes(document.readyState)) resolve(true)
       })
     }
   })
@@ -67,23 +62,13 @@ function domReady(condition: DocumentReadyState[] = ['complete', 'interactive'])
 
 const safeDOM = {
   append(parent: HTMLElement, child: HTMLElement) {
-    if (!Array.from(parent.children).find(e => e === child)) {
-      return parent.appendChild(child)
-    }
+    if (!Array.from(parent.children).find(e => e === child)) return parent.appendChild(child)
   },
   remove(parent: HTMLElement, child: HTMLElement) {
-    if (Array.from(parent.children).find(e => e === child)) {
-      return parent.removeChild(child)
-    }
+    if (Array.from(parent.children).find(e => e === child)) return parent.removeChild(child)
   },
 }
 
-/**
- * https://tobiasahlin.com/spinkit
- * https://connoratherton.com/loaders
- * https://projects.lukehaas.me/css-loaders
- * https://matejkustec.github.io/SpinThatShit
- */
 function useLoading() {
   const className = `loaders-css__square-spin`
   const styleContent = `
@@ -115,25 +100,16 @@ function useLoading() {
     `
   const oStyle = document.createElement('style')
   const oDiv = document.createElement('div')
-
   oStyle.id = 'app-loading-style'
   oStyle.innerHTML = styleContent
   oDiv.className = 'app-loading-wrap'
   oDiv.innerHTML = `<div class="${className}"><div></div></div>`
 
   return {
-    appendLoading() {
-      safeDOM.append(document.head, oStyle)
-      safeDOM.append(document.body, oDiv)
-    },
-    removeLoading() {
-      safeDOM.remove(document.head, oStyle)
-      safeDOM.remove(document.body, oDiv)
-    },
+    appendLoading() { safeDOM.append(document.head, oStyle); safeDOM.append(document.body, oDiv) },
+    removeLoading() { safeDOM.remove(document.head, oStyle); safeDOM.remove(document.body, oDiv) },
   }
 }
-
-// ----------------------------------------------------------------------
 
 const { appendLoading, removeLoading } = useLoading()
 domReady().then(appendLoading)

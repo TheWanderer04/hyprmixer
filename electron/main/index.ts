@@ -4,7 +4,18 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import os from 'node:os'
 import { update } from './update'
-import { execSync } from 'node:child_process'
+import { execSync as _execSync } from 'node:child_process'
+
+// Wrapper around execSync that explicitly pipes all stdio instead of
+// inheriting from the parent. When hyprmixer is launched detached from a
+// terminal (e.g. via a waybar widget) and the parent shell exits, the
+// inherited file descriptors get closed. Later execSync calls then crash
+// the main process with "EIO: i/o error, write" when they try to write
+// progress/diagnostics to those dead fds. Forcing 'pipe' on every call
+// gives the child fresh fds owned by Node, which keeps working forever.
+function execSync(cmd: string): Buffer {
+  return _execSync(cmd, { stdio: ['ignore', 'pipe', 'pipe'] })
+}
 import Track from '@/model/Track'
 import Player from '@/model/Player'
 import Sink from '@/model/Sink'
@@ -27,6 +38,17 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 
 if (os.release().startsWith('6.1')) app.disableHardwareAcceleration()
 if (process.platform === 'win32') app.setAppUserModelId(app.getName())
+
+// Don't let a single failing pactl/playerctl command (or a transient EIO
+// from a closed parent fd) kill the whole app — just log and carry on.
+// Without this Electron pops a "JavaScript error in main process" dialog
+// and the user has to restart the app manually.
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err)
+})
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason)
+})
 
 // Relocate config from default ~/.config/hyprmixer to ~/.config/hypr/hyprmixer
 // so it lives alongside other Hyprland-related configs.
